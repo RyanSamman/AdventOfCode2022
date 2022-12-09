@@ -5,6 +5,7 @@ use r#move::Move;
 
 use crate::rope_simulation::RopeSimulation;
 
+// NOTE: Could improve struct visibility & project modile structure next time
 mod rope_simulation;
 mod rope;
 mod direction;
