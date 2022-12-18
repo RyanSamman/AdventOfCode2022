@@ -3,19 +3,29 @@ use std::collections::HashMap;
 mod solution_a;
 mod solution_b;
 
+use itertools::Itertools;
 use regex::Regex;
 
-use crate::{solution_b::solve_b, solution_a::solve_a};
+type ValveID = usize;
+
+use crate::{solution_a::solve_a, solution_b::solve_b};
 
 #[derive(Debug)]
 pub struct Valve {
+    pub id: usize,
     pub name: String,
     pub flow_rate: i32,
-    pub leads_to: Vec<String>,
+    pub leads_to: Vec<ValveID>,
 }
 
-fn parse_valves(input: &str) -> HashMap<String, Valve> {
-    fn parse_valve(line: &str) -> Valve {
+fn parse_valves(input: &str) -> Vec<Valve> {
+    pub struct ParsedValve {
+        pub name: String,
+        pub flow_rate: i32,
+        pub leads_to: Vec<String>,
+    }
+
+    fn parse_valve(line: &str) -> ParsedValve {
         let re = Regex::new(
             r"Valve (?P<name>[A-Z]{2}) has flow rate=(?P<flow_rate>\d+); tunnel(s)? lead(s)? to valve(s)? (?P<leads_to>([A-Z]{2}, )*[A-Z]{2})"
         ).unwrap();
@@ -29,18 +39,39 @@ fn parse_valves(input: &str) -> HashMap<String, Valve> {
             .map(ToString::to_string)
             .collect();
 
-        Valve {
+        ParsedValve {
             name,
             flow_rate,
             leads_to,
         }
     }
 
-    input
+    fn resolve_valves(vs: Vec<ParsedValve>) -> Vec<Valve> {
+        let name_to_id_resolver: HashMap<String, ValveID> =
+            vs.iter().enumerate().map(|(i, v)| (v.name.clone(), i)).collect();
+
+        let mut valves = Vec::new();
+
+        for pv in vs {
+            let v = Valve {
+                id: name_to_id_resolver[&pv.name],
+                name: pv.name,
+                flow_rate: pv.flow_rate,
+                leads_to: pv.leads_to.iter().map(|vn| name_to_id_resolver[vn]).collect_vec(),
+            };
+
+            valves.push(v);
+        }
+
+        valves
+    }
+
+    let parsed_valves = input
         .lines()
         .map(parse_valve)
-        .map(|v| (v.name.clone(), v))
-        .collect()
+        .collect_vec();
+
+    resolve_valves(parsed_valves)
 }
 
 fn main() {
