@@ -67,8 +67,7 @@ fn compute_dequeue_weight(
 
         if current_valve_id == to {
             return distance;
-        }
-         else if computed_weights.contains_key(&(current_valve_id, to)) {
+        } else if computed_weights.contains_key(&(current_valve_id, to)) {
             let distance_to_end = computed_weights[&(current_valve_id, to)] + 1;
             queue.push_decrease(to, distance_to_end + distance - 1);
         } else {
@@ -103,66 +102,46 @@ fn compute_weights(valves: &Vec<Valve>) -> HashMap<(ValveID, ValveID), i32> {
     weights
 }
 
-// Maximum flow from next actions
-// Assume already opened current_valve and is moving onto the next
-fn max_flow(
-    minutes_left: i32,
-    current_valve: &Valve,
-    valves: &Vec<Valve>,
-    computed_weights: &HashMap<(ValveID, ValveID), i32>,
-    visited: &mut HashSet<ValveID>,
-) -> i32 {
-    if minutes_left <= 0 {
-        return 0;
-    }
-
-    let mut max = 0;
-
-    for next_valve in valves {
-        if visited.contains(&next_valve.id) || next_valve.flow_rate == 0 {
-            continue;
-        }
-
-        visited.insert(next_valve.id);
-
-        // Hope this little maneuver doesn't cost us 51 years!
-        let little_maneuver_cost = computed_weights[&(current_valve.id, next_valve.id)];
-        // Opening the current valve cost 1 minute, and moving to the next valve gives us
-        let m = minutes_left - little_maneuver_cost - 1;
-
-        let mut flow = next_valve.flow_rate * m;
-        flow += max_flow(m, next_valve, valves, computed_weights, visited);
-        max = max.max(flow);
-
-        visited.remove(&next_valve.id);
-    }
-
-    max
-}
-
 pub fn solve_a(valves: Vec<Valve>) -> i32 {
     valves.iter().for_each(|v| println!("{v:?}"));
     let minutes_left = 30;
 
-    let root_valve = Valve {
-        id: valves.len(), // will panic if attempting to check index
-        name: "root".to_string(),
-        flow_rate: 0,
-        leads_to: (0..valves.len()).into_iter().collect_vec(),
-    };
-
     let mut weights = compute_weights(&valves);
 
-    weights.iter()
-           .sorted()
-           .for_each(|(&(f, t), d)| println!("{} - {}: {d}", valves[f].name, valves[t].name));
+    let flow_valves = valves
+        .iter()
+        .enumerate()
+        .filter(|(i, v)| v.flow_rate != 0)
+        .map(|(i, v)| i).collect_vec();
 
-    // // Moving from the root to any other node costs 1
-    for &v_id in root_valve.leads_to.iter() {
-        weights.insert((root_valve.id, v_id), 1);
+
+    let mut max = 0;
+
+    let get_flow = |id: ValveID| valves[id].flow_rate;
+
+    // Bug somewhere, but I can't find it ;/
+    for mut path in flow_valves.iter().copied().permutations(flow_valves.len() - 1) {
+        let mut previous_valve_id = path.pop().unwrap();
+        let mut t = minutes_left - 2;
+        let mut flow = t * get_flow(previous_valve_id);
+
+        while !path.is_empty() {
+            let current_valve_id = path.pop().unwrap();
+
+            let time_between_vents = weights[&(previous_valve_id, current_valve_id)];
+
+            t -= time_between_vents + 1;
+
+            if t <= 0 {
+                break;
+            }
+
+            flow += t * get_flow(current_valve_id);
+            previous_valve_id = current_valve_id;
+        }
+
+        max = max.max(flow);
     }
 
-    let mut visited = HashSet::new();
-
-    max_flow(minutes_left, &root_valve, &valves, &weights, &mut visited)
+    max
 }
